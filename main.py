@@ -17,6 +17,8 @@
 # import necessary libraries
 import requests
 import base64
+import time
+from datetime import datetime, timedelta, timezone
 
 # define the URL we want to 'call'.
 BASE_URL = "https://live.trading212.com/api/v0"
@@ -63,6 +65,10 @@ def get_api_key():
 
 # function to fetch account cash data
 def fetch_account_cash():
+
+    ##########
+    ## CASH ##
+    ##########
 
     # add the api_key to a variable for use in the function
     key_id, secret_key = get_api_key()
@@ -126,38 +132,71 @@ def fetch_account_cash():
         print(f"Reason: {rsp_cash.text}")
 
 
+
+    ###########
+    # HISTORY #
+    ###########
+
     # connect to the HISTORY endpoint
     ep_hist = BASE_URL + ENDPOINT_HISTORY
+
+    # set from and to date for history reports
+    now = datetime.now(timezone.utc)
+    sdt = now - timedelta(weeks=4)
+    time_from = sdt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    time_to = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # set payload
+    payload = {
+      "dataIncluded": {
+        "includeDividends": True,
+        "includeInterest": True,
+        "includeOrders": True,
+        "includeTransactions": True
+        },
+      "timeFrom": time_from,
+      "timeTo": time_to
+    }
 
     # request .csv reports
     print(f"Connecting to: {ep_hist}...")
 
     # perform GET request on endpoint
-    rsp_hist = requests.get(ep_hist, headers=headers)
+    rsp_hist = requests.post(ep_hist, json=payload, headers=headers)
 
-    # check the response code
-    if rsp_hist.status_code == 200:
+    # set loop variable
+    attempts = 10
+    count = 1
 
-        # print success message
-        print("Success! Connection estblished.")
-
-        # parse the JSON data from the response
+    while count < attempts:
+      print(f"Checking status, attempt {count} of {attempts}...")
+      rsp_hist = requests.get(ep_hist, headers = headers)
+      if rsp_hist.status_code == 200:
         data_hist = rsp_hist.json()
-
-        # print data to the console
-        print(" ")
-        print("--- Response from History call ---")
+        print(f"Response {count}")
         print(data_hist)
-        print(" ")
-
-    else:
-
-        # return the status code
+        if data_hist and data_hist[0].get("status") == "Finished":
+          print("Report has finished generating")
+          break
+      else:
         print(f"Failed. Status Code: {rsp_hist.status_code}")
-
-        # return the reason for failure
         print(f"Reason: {rsp_hist.text}")
+      count += 1
+      print(" ")
+      print(" ")
+      time.sleep(2)
 
+    status = data_hist[0].get("status")
+    if status != "Finished":
+      print("No reports finished generating in time")
+      return
+    else:
+      print("Report was generated successfully!")
+      print("Now to figure out how to get it..")
+
+    print(" ")
+    #print(data_hist)
+    print(" ")
 
 #####################
 # EXECUTION CONTROL #
