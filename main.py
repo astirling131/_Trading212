@@ -22,7 +22,7 @@ import base64
 BASE_URL = "https://live.trading212.com/api/v0"
 # define the specific endpoint for account cash data
 ENDPOINT_CASH = "/equity/account/cash"
-
+ENDPOINT_HISTORY = "/equity/history/exports"
 
 
 ####################
@@ -92,37 +92,71 @@ def fetch_account_cash():
         "Authorization": auth_header_value
     }
 
-    # connect the base URL with the specific endpoint
-    full_url = BASE_URL + ENDPOINT_CASH
-    
+    # connect to the CASH endpoint
+    ep_cash  = BASE_URL + ENDPOINT_CASH
+
     # inform the user we are connecting
-    print(f"Connecting to: {full_url}...")
+    print(f"Connecting to: {ep_cash}...")
 
     # perform a GET request and store the response in a variable
-    response = requests.get(full_url, headers=headers)
+    rsp_cash = requests.get(ep_cash, headers=headers)
 
     # check the response is 200 (status Code 200 means 'success')
-    if response.status_code == 200:
+    if rsp_cash.status_code == 200 :
 
         # print a success message
         print("Success! Connection Established.")
 
         # parse the JSON data from the response
-        data = response.json()
+        data_cash = rsp_cash.json()
 
         # print the data to the console
+        print(" ")
         print("--- Your Account Cash Data ---")
-        print(data)
+        print(data_cash)
+        print(" ")
 
     # if the response code is not 200, print an error message
     else:
 
         # return the status code
-        print(f"Failed. Status Code: {response.status_code}")
+        print(f"Failed. Status Code: {rsp_cash.status_code}")
 
         # return the reason for failure
-        print(f"Reason: {response.text}")
+        print(f"Reason: {rsp_cash.text}")
 
+
+    # connect to the HISTORY endpoint
+    ep_hist = BASE_URL + ENDPOINT_HISTORY
+
+    # request .csv reports
+    print(f"Connecting to: {ep_hist}...")
+
+    # perform GET request on endpoint
+    rsp_hist = requests.get(ep_hist, headers=headers)
+
+    # check the response code
+    if rsp_hist.status_code == 200:
+
+        # print success message
+        print("Success! Connection estblished.")
+
+        # parse the JSON data from the response
+        data_hist = rsp_hist.json()
+
+        # print data to the console
+        print(" ")
+        print("--- Response from History call ---")
+        print(data_hist)
+        print(" ")
+
+    else:
+
+        # return the status code
+        print(f"Failed. Status Code: {rsp_hist.status_code}")
+
+        # return the reason for failure
+        print(f"Reason: {rsp_hist.text}")
 
 
 #####################
