@@ -18,6 +18,7 @@
 import requests
 import base64
 import time
+import pandas as pd
 from datetime import datetime, timedelta, timezone
 
 # define the URL we want to 'call'.
@@ -75,13 +76,15 @@ def fetch_account_cash():
 
     # exit the function if we didn't get a key
     if not key_id or not secret_key:
+        print(" ")
+        print(" ")
         print("Error: Credentials missing in .env file.")
         return
 
     # create the authorization header value
     credentials_string = f"{key_id}:{secret_key}"
 
-    # encode the credentials to UTF-8 
+    # encode the credentials to UTF-8
     raw_bytes = credentials_string.encode("utf-8")
 
     # encode the bytes to Base64
@@ -102,16 +105,21 @@ def fetch_account_cash():
     ep_cash  = BASE_URL + ENDPOINT_CASH
 
     # inform the user we are connecting
+    print(" ")
+    print(" ")
     print(f"Connecting to: {ep_cash}...")
+    print(" ")
 
     # perform a GET request and store the response in a variable
     rsp_cash = requests.get(ep_cash, headers=headers)
+    time.sleep(3)
 
     # check the response is 200 (status Code 200 means 'success')
     if rsp_cash.status_code == 200 :
 
         # print a success message
         print("Success! Connection Established.")
+        print(" ")
 
         # parse the JSON data from the response
         data_cash = rsp_cash.json()
@@ -121,17 +129,19 @@ def fetch_account_cash():
         print("--- Your Account Cash Data ---")
         print(data_cash)
         print(" ")
+        print(" ")
 
     # if the response code is not 200, print an error message
     else:
 
         # return the status code
         print(f"Failed. Status Code: {rsp_cash.status_code}")
+        print(" ")
 
         # return the reason for failure
         print(f"Reason: {rsp_cash.text}")
-
-
+        print(" ")
+        return
 
     ###########
     # HISTORY #
@@ -160,9 +170,27 @@ def fetch_account_cash():
 
     # request .csv reports
     print(f"Connecting to: {ep_hist}...")
+    print(" ")
 
-    # perform GET request on endpoint
-    rsp_hist = requests.post(ep_hist, json=payload, headers=headers)
+    # perform POST request on endpoint
+    pstr = requests.post(ep_hist, json=payload, headers=headers)
+    time.sleep(3)
+    if pstr.status_code == 200:
+      dpst = pstr.json()
+      if dpst:
+        rpt_id = dpst.get("reportId")
+        print(f"Report ID: {rpt_id}")
+        print(" ")
+      else:
+        print("No report id in the POST response")
+        print(" ")
+        return
+    else:
+      print(f"Failed. Status Code: {pstr.status_code}")
+      print(" ")
+      print(f"Reason: {pstr.text}")
+      print(" ")
+      return
 
     # set loop variable
     attempts = 10
@@ -170,33 +198,55 @@ def fetch_account_cash():
 
     while count < attempts:
       print(f"Checking status, attempt {count} of {attempts}...")
-      rsp_hist = requests.get(ep_hist, headers = headers)
-      if rsp_hist.status_code == 200:
-        data_hist = rsp_hist.json()
-        print(f"Response {count}")
-        print(data_hist)
+      print(" ")
+      getr = requests.get(ep_hist, headers = headers)
+      if getr.status_code == 200:
+        data_hist = getr.json()
         if data_hist and data_hist[0].get("status") == "Finished":
           print("Report has finished generating")
+          dl_url = data_hist[0].get("downloadLink")
+          print(f"Download link is: {dl_url}")
+          print(" ")
           break
       else:
-        print(f"Failed. Status Code: {rsp_hist.status_code}")
-        print(f"Reason: {rsp_hist.text}")
+        print(f"Failed. Status Code: {getr.status_code}")
+        print(" ")
+        print(f"Reason: {getr.text}")
+        print(" ")
       count += 1
-      print(" ")
-      print(" ")
-      time.sleep(2)
+      time.sleep(5)
 
     status = data_hist[0].get("status")
     if status != "Finished":
       print("No reports finished generating in time")
+      print(" ")
       return
     else:
       print("Report was generated successfully!")
-      print("Now to figure out how to get it..")
+      print("Now requesting download...")
+      print(" ")
 
-    print(" ")
-    #print(data_hist)
-    print(" ")
+    if dl_url:
+      df = pd.read_csv(dl_url)
+      time.sleep(10)
+    else:
+      print("No download link exists..")
+      print(" ")
+      return
+
+    if not df.empty:
+      df.to_csv('history_report.csv', index=False)
+      print("Printing first 3 lines of dataframe..")
+      print(" ")
+      print(df.head(3))
+      print(" ")
+    else:
+      print("Dataframe is empty")
+      print(" ")
+      return
+
+    # END OF CODE
+    return
 
 #####################
 # EXECUTION CONTROL #
