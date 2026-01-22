@@ -22,6 +22,39 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple
 
+def _get_api_keys(provider: str) -> Tuple[str, str]:
+    # get the api key and secret from the .env file
+    api_key_id, api_secret = None, None
+    # run inside a try block for error handling
+    try:
+        # Check the requested provider
+        if provider == "Trading212":
+            # load data from the .env file into 'file' variable
+            with open(".env", "r") as file:
+                for line in file:
+                    parts = line.strip().split("=")
+                    if len(parts) == 2:
+                        if parts[0] == "T212_API_KEY":
+                            api_key = parts[1]
+                        elif parts[0] == "T212_API_SECRET":
+                            api_secret = parts[1]
+            return api_key, api_secret
+        elif provider == "TwelveData":
+            # load data from the .env file into 'file' variable
+            with open(".env", "r") as file:
+                for line in file:
+                    parts = line.strip().split("=")
+                    if len(parts) == 2:
+                        if parts[0] == "TWD_API_KEY":
+                            api_key = parts[1]
+            return api_key, None
+    # catch file not found error
+    except FileNotFoundError:
+        # print an error message if the .env file is missing
+        print("\nError: .env file not found!")
+        # return None to the function caller to indicate failure
+        return None, None
+        
 ##############
 # T212 CLASS #
 ##############
@@ -41,33 +74,9 @@ class Trading212Client:
            self.url = "https://live.trading212.com/api/v0"
         self.headers = self._set_auth_header()
 
-    def _get_api_keys(self) -> Tuple[str, str]:
-        # get the api key and secret from the .env file
-        api_key_id = None
-        api_secret = None
-        # run inside a try block for error handling
-        try:
-            # load data from the .env file into 'file' variable
-            with open(".env", "r") as file:
-                for line in file:
-                    parts = line.strip().split("=")
-                    if len(parts) == 2:
-                        if parts[0] == "T212_API_KEY":
-                            api_key = parts[1]
-                        elif parts[0] == "T212_API_SECRET":
-                            api_secret = parts[1]
-            return api_key, api_secret
-
-        # catch file not found error
-        except FileNotFoundError:
-            # print an error message if the .env file is missing
-            print("\nError: .env file not found!")
-            # return None to the function caller to indicate failure
-            return None, None
-
     def _set_auth_header(self) -> Dict[str, str]:
         # add the api_key to a variable for use in the function
-        key_id, secret_key = self._get_api_keys()
+        key_id, secret_key = _get_api_keys("Trading212")
         # exit the function if we didn't get a key
         if not key_id or not secret_key:
             print("\nError: Credentials missing in .env file.")
@@ -112,27 +121,32 @@ class Trading212Client:
             print(f"An error occurred during request: {e}")
             return None
 
-    def _poll_for_completion(self, reportid: int) -> Opti>
+    def _poll_for_completion(self, report_id: int) -> Optional[str]:
         endpoint = self.ENDPOINT_HISTORY
         # set loop variable
         attempts: int = 10
         count: int = 1
-        while count < attempts:
-            print(f"\nChecking status, attempt {count} of>
-            exports = self._make_request("GET", endpoint)
-            time.sleep(5)
-            if exports:
-                target_report = None
-                for report in exports:
-                    if report.get("reportId") == reportid:
-                        target_report = report
-                        break
-                if target_report:
-                    status = target_report.get("status")
-                    if status == "Finished":
-                        print(f"Status is {status}")
-                        return target_report.get("downloa>
-                    time.sleep(5)
+        # run inside a try catch block for error handling
+        try:
+            while count < attempts:
+                print(f"Checking status, attempt {count} of {attempts}...")
+                exports = self._make_request("GET", endpoint)
+                time.sleep(5)
+                if exports:
+                    target_report = None
+                    for report in exports:
+                        if report.get("reportId") == report_id:
+                            target_report = report
+                            break
+                    if target_report:
+                        status = target_report.get("status")
+                        if status == "Finished":
+                            print(f"Status is {status}")
+                            return target_report.get("downloadLink")
+                        time.sleep(5)
+        except Exception as e:
+            print(f"An error occurred while polling for report completion: \n{e}")
+            return None
         print("\nTimed out waiting on report")
         return None
 
@@ -173,21 +187,21 @@ class Trading212Client:
         if not response or "reportId" not in response:
             print("Failed to get Report ID")
             return
-        reportid = response.get("reportId")
-        print(f"Report ID: {reportid}")
-        download_link = self._poll_for_completion(reportid)
+        report_id = response.get("reportId")
+        print(f"Report ID: {report_id}")
+        download_link = self._poll_for_completion(report_id)
         if download_link:
             print("\nDownloading .csv report...")
             df = pd.read_csv(download_link)
             if not df.empty:
-                filename = f"History Report {reportid}.csv"
+                filename = f"History Report {report_id}.csv"
                 df.to_csv(filename, index=False)
                 print(f"Saved to {filename}")
             else:
                 print(".csv report was empty.")
 
-    def download_ticker_data(self) -> None:
-        endpoint = self.ENDPOINT_TICKER
+##    def download_ticker_data(self) -> None:
+##        endpoint = self.ENDPOINT_TICKER
         
 #####################
 # EXECUTION CONTROL #
@@ -198,5 +212,4 @@ if __name__ == "__main__":
     client = Trading212Client(is_demo=False)
     client.fetch_account_cash()
     client.download_historic_data()
-    client.downloaf_ticker_data()
-
+##    client.download_ticker_data()
