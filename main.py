@@ -18,10 +18,9 @@ import base64
 import time
 import pandas as pd
 import os
-import yfinance as yf
+from yahooquery import Ticker
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple
-from twelvedata import TDClient
 
 # function to get the api key and secret from the .env file
 def _get_api_keys(provider: str) -> Tuple[str, str]:
@@ -41,22 +40,13 @@ def _get_api_keys(provider: str) -> Tuple[str, str]:
                         elif parts[0] == "T212_API_SECRET":
                             api_secret = parts[1]
             return api_key, api_secret
-        elif provider == "TwelveData":
-            # load data from the .env file into 'file' variable
-            with open(".env", "r") as file:
-                for line in file:
-                    parts = line.strip().split("=")
-                    if len(parts) == 2:
-                        if parts[0] == "TWD_API_KEY":
-                            api_key = parts[1]
-            return api_key, None
     # catch file not found error
     except FileNotFoundError:
         # print an error message if the .env file is missing
         print("\nError: .env file not found!")
         # return None to the function caller to indicate failure
         return None, None
-        
+
 ##############
 # T212 CLASS #
 ##############
@@ -175,7 +165,7 @@ class Trading212Client:
         # if we reach here it timed out
         print("\nTimed out waiting on report")
         return None
-    
+
     ##~~~~~~~~~~~~~~~~~~
     ## CLASS FUNCTIONS
     ##~~~~~~~~~~~~~~~~~~
@@ -212,20 +202,27 @@ class Trading212Client:
         # perform POST request on endpoint
         response = self._make_request("POST", endpoint, payload)
         time.sleep(5)
+        # check if a report id was in the response
         if not response or "reportId" not in response:
             print("Failed to get Report ID")
             return
         report_id = response.get("reportId")
         print(f"Report ID: {report_id}")
+        # poll for the download to complete and get report link
         download_link = self._poll_for_completion(report_id)
         if download_link:
             print("\nDownloading .csv report...")
+            # read report into a dataframe
             df = pd.read_csv(download_link)
+            # check report was not empty
             if not df.empty:
+                # set filename
                 filename = f"History Report {report_id}.csv"
+                # save report
                 df.to_csv(filename, index=False)
                 print(f"Saved to {filename}")
             else:
+                # warn user if report was empty
                 print(".csv report was empty.")
 
 ##################
@@ -238,39 +235,71 @@ class YFinanceClient:
     def __init__(self):
         pass
 
-    # function to get historic market data  
-    def get_historic_data(self, symbol: str, interval: str = "15m", period: str = "1mo") -> None:
-        print(f"\n--- Fetching {interval} data for {symbol} ---")
+    # yahooquery
+    def _yahooquery(self, ticker: str, interval: str, period: str) -> pd.DataFrame:
+        try:
+            # set the ticker using yahooquery
+            t = Ticker(ticker)
+            # create dataframe with ticker data
+            df = t.history(period=period, interval=interval)
+            # return an empty dataframe if an empty dictionary returned
+            if isinstance(df, dict) or df.empty:
+                return df.DataFrame()
+            df.reset_index(inplace=True)
+            # return the ticker data as dataframe
+            return df
+        except Exception as e:
+            print(f"\nError fetching {ticker}: {e}")
+            # return empty dataframe on error
+            return pd.DataFrame()
+
+    # get the ticker symbols from the csv
+    def get_tickers(self, filename: str = "tickers.csv", col_index: int = 2):
+        # read list of tickers
+        data = pd.read_csv(filename, header=0, usecols=[col_index])
+        # loop through each and call download function
+        for row in data.itertuples(index=False, name=None):
+            value = str(row[0])
+            try:
+                # download ticker data
+                self.download_data(value)
+                # sleep to avoid multiple calls in short succession
+                sleep(1)
+            except Exception as e:
+                # warn the user if there was an error
+                print(f"\nError reading csv: {e}")
+
+    # function to get historic market data
+    def download_data(self, symbol: str, interval: str = "15m", period: str = "1mo") -> None:
+        print(f"\nFetching {interval} data for {symbol}...")
+        # add the .l for known lse stocks
         if symbol in ["CSP1", "VHYL", "IDVY"] and not symbol.endswith(".L"):
             symbol = f"{symbol}.L"
         try:
-            df = yf.download(
-                tickers=symbol, 
-                interval=interval, 
-                period=period,
-                progress=False
-            )
+            # run the yahoo query
+            df = self._yahooquery(symbol, interval, period)
             if not df.empty:
-                # Yahoo returns complex MultiIndex columns sometimes
-                df.reset_index(inplace=True)
                 # Save to Disk
                 folder = "market_data"
+                # create folder if dosent exist
                 os.makedirs(folder, exist_ok=True)
+                # set filename
                 filename = f"{folder}/{symbol}_{interval}.csv"
+                # save the report
                 df.to_csv(filename, index=False)
                 print(f"Success! Saved {len(df)} rows to {filename}")
-                print(df.head(3))
             else:
+                # warn the user if no data returned
                 print(f"Error: No data found for {symbol}")
         except Exception as e:
+            # warn the user if an error occurred
             print(f"An error occurred: {e}")
-     
+
 ##################
-# MAIN EXECUTION #
+# IMPORT TRIGGER #
 ##################
 
-# Execution control
-if __name__ == "__main__":
+def launch_app()
 
     # 1. Trading212 Client Usage
     client001 = Trading212Client(is_demo=False)
@@ -279,5 +308,14 @@ if __name__ == "__main__":
 
     # 2. YFinanceClient Client Usage
     client002 = YFinanceClient()
-    client002.get_historic_data(symbol="CSP1")
-    
+    client002.get_tickers()
+
+##################
+# MAIN EXECUTION #
+##################
+
+# Execution control
+if __name__ == "__main__":
+
+    # launch the app
+    launch_app()
