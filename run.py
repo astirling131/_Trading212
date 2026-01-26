@@ -1,12 +1,12 @@
-########################################################
-#
-# Name: Run.py
-# Author: Andrew Stirling
-# Version: 1.01
-# Description: Install python dependancies and
-#              import main.py to start program
-#
-########################################################
+########################################################################################################################
+##                                                                                                                    ##
+## Name: Run.py                                                                                                       ##
+## Author: Andrew Stirling                                                                                            ##
+## Version: 1.01                                                                                                      ##
+## Description: Install python dependancies and                                                                       ##
+##              import main.py to start program                                                                       ##
+##                                                                                                                    ##
+########################################################################################################################
 
 import sys
 import subprocess
@@ -47,6 +47,7 @@ if __name__ == "__main__":
         import main
         print(f"Launching app...\n")
         # launch app function
+        # TESTING - print("Simulating App Launch...\n")
         main.launch_app()
     except ImportError as e:
         # warn user on error

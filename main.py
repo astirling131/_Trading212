@@ -117,7 +117,7 @@ class Trading212Client:
                 # on failed request print the status code and reason
                 print(f"Request failed. Status: {response.status_code}")
                 print(f"Reason: {response.text}")
-                return None
+                return response.status_code
         # catch any exceptions that occur during the request
         except Exception as e:
             print(f"An error occurred during request: {e}")
@@ -139,6 +139,10 @@ class Trading212Client:
                 exports = self._make_request("GET", endpoint)
                 # wait before next attempt
                 time.sleep(5)
+                # Check for a 'too many requests' error and break if so
+                if exports == 429:
+                    print("Rate limit exceeded, try again later.")
+                    return None
                 # check if the request returned any exports
                 if exports:
                     target_report = None
@@ -176,6 +180,10 @@ class Trading212Client:
         data = self._make_request("GET", endpoint)
         # wait for response from requeest
         time.sleep(5)
+        # Check for a 'too many requests' error and break if so
+        if data == 429:
+            print("Rate limit exceeded, try again later.")
+            return None
         if data:
             print(f"\n---CASH DATA---")
             print(data)
@@ -201,7 +209,11 @@ class Trading212Client:
         }
         # perform POST request on endpoint
         response = self._make_request("POST", endpoint, payload)
-        time.sleep(5)
+        time.sleep(5)        
+        # Check for a 'too many requests' error and break if so
+        if response == 429:
+            print("Rate limit exceeded, try again later.")
+            return None
         # check if a report id was in the response
         if not response or "reportId" not in response:
             print("Failed to get Report ID")
@@ -244,7 +256,7 @@ class YFinanceClient:
             df = t.history(period=period, interval=interval)
             # return an empty dataframe if an empty dictionary returned
             if isinstance(df, dict) or df.empty:
-                return df.DataFrame()
+                return pd.DataFrame()
             df.reset_index(inplace=True)
             # return the ticker data as dataframe
             return df
@@ -264,7 +276,7 @@ class YFinanceClient:
                 # download ticker data
                 self.download_data(value)
                 # sleep to avoid multiple calls in short succession
-                sleep(1)
+                time.sleep(1)
             except Exception as e:
                 # warn the user if there was an error
                 print(f"\nError reading csv: {e}")
@@ -273,7 +285,7 @@ class YFinanceClient:
     def download_data(self, symbol: str, interval: str = "15m", period: str = "1mo") -> None:
         print(f"\nFetching {interval} data for {symbol}...")
         # add the .l for known lse stocks
-        if symbol in ["CSP1", "VHYL", "IDVY"] and not symbol.endswith(".L"):
+        if symbol in ["CSP1", "VHYL", "XMWX", "IGL5"] and not symbol.endswith(".L"):
             symbol = f"{symbol}.L"
         try:
             # run the yahoo query
@@ -299,7 +311,7 @@ class YFinanceClient:
 # IMPORT TRIGGER #
 ##################
 
-def launch_app()
+def launch_app():
 
     # 1. Trading212 Client Usage
     client001 = Trading212Client(is_demo=False)
