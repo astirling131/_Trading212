@@ -135,14 +135,16 @@ class Trading212Client:
             # loop until max attempts
             while count < attempts:
                 print(f"Checking status, attempt {count} of {attempts}...")
+                # wait 5 seconds before HTTP request to avoid multiple calls in short succession
+                time.sleep(5)
                 # perform GET request on endpoint
                 exports = self._make_request("GET", endpoint)
                 # wait before next attempt
                 time.sleep(5)
                 # Check for a 'too many requests' error and break if so
                 if exports == 429:
-                    print("Rate limit exceeded, try again later.")
-                    return None
+                    print("Rate limit exceeded, waiting longer before trying again...")
+                    time.sleep(5)
                 # check if the request returned any exports
                 if exports:
                     target_report = None
@@ -160,8 +162,6 @@ class Trading212Client:
                             print(f"Status is {status}")
                             # return the download link
                             return target_report.get("downloadLink")
-                        # wait 5 seconds before next loop iteration if report is not ready to download
-                        time.sleep(5)
         # catch any exceptions that occur during polling
         except Exception as e:
             print(f"An error occurred while polling for report completion: \n{e}")
