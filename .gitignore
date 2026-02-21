@@ -2,3 +2,20 @@
 __pycache__/
 *.csv
 *.pptx
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# Build outputs
+frontend/dist/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
