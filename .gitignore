@@ -2,6 +2,7 @@
 __pycache__/
 *.csv
 *.pptx
+org_chart.txt
 
 # Virtual Environment
 venv/
